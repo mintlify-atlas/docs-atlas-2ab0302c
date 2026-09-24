@@ -1,5 +1,5 @@
 ---
-title: "@org-quicko/silo-client TypeScript SDK reference"
+title: "Silo TypeScript client SDK — @org-quicko/silo-client"
 sidebarTitle: "TypeScript SDK"
 description: "The Silo TypeScript client provides typed access to collections, entries, media, and search. Runs on Node 18+, Bun, Deno, and browsers."
 ---
@@ -11,6 +11,8 @@ The Silo TypeScript client mirrors the shape of Silo itself: a client holds proj
 ```bash
 npm install @org-quicko/silo-client
 ```
+
+Published to npm as `@org-quicko/silo-client`.
 
 ## Basic setup
 
@@ -119,7 +121,7 @@ An entry is the wire's own flat object. Your fields and the Silo envelope live t
 }
 ```
 
-Five field names belong to the envelope — `id`, `rev`, `seq`, `created_at`, `updated_at` — and Silo refuses a schema that declares one of them as a field.
+The envelope keys are `id`, `rev`, `created_at`, and `updated_at`. Silo refuses a schema that declares one of them as a field name.
 
 ## Queries
 
@@ -210,18 +212,47 @@ Store `MediaReference.of(id)` in your entry, not the URL. If a file is renamed o
 
 ```ts
 await poster.rename("arrival-2016.jpg")
+await poster.moveTo("posters/2016")
+await poster.setTags(["poster"])        // replaces the whole list
 await poster.replace(file)              // new bytes, same id and URL
+await poster.delete()                   // refused while an entry refers to it
 await poster.delete({ force: true })
+
+const usage = await poster.usages()
+usage.usages    // the referring entries this key may read
+usage.total     // the true count
+usage.visible   // how many of them this key may see
 ```
 
 `replace` swaps the bytes behind an asset. The id, reference, name, and URL all stay the same, so every entry that references the asset shows the new file without any entries being rewritten.
+
+Folder operations and a bulk delete that takes up to 100 ids:
+
+```ts
+await silo.media.folders.list()
+await silo.media.folders.create("posters/2016")
+await silo.media.folders.rename("posters", "artwork", { merge: true })
+await silo.media.folders.delete("artwork", { recursive: true })
+
+const report = await silo.media.deleteMany(ids, { force: true })
+report.deleted
+report.failed
+```
 
 ## Variables
 
 Declare a variable once per project, then give it a value per environment. Silo substitutes `{{NAME}}` in entries on the way out.
 
 ```ts
-await environment.variables.set("CDN_URL", "https://cdn.example.com")
+const moviespace = silo.project("moviespace")
+await moviespace.variables.declare("CDN_URL", {
+  environment: "prod",
+  value: "https://cdn.moviespace.com",
+})
+
+const environment = moviespace.environment("prod")
+await environment.variables.list()
+await environment.variables.set("CDN_URL", "https://cdn.moviespace.com")
 await environment.variables.unset("CDN_URL")
 ```
 
@@ -266,7 +297,7 @@ try {
 }
 ```
 
-`SiloError` is the base for anything Silo refused: `ValidationFailedError`, `UnauthorizedError`, `ForbiddenError`, `NotFoundError`, `ConflictError`, `MediaInUseError`, and `InternalError`.
+`SiloError` is the base for anything Silo refused: `ValidationFailedError`, `UnauthorizedError`, `ForbiddenError`, `NotFoundError`, `ConflictError`, `MediaInUseError`, `MediaDeleteStalledError`, and `InternalError`.
 
 `NetworkError`, `TimeoutError`, `RequestAbortedError`, and `InvalidResponseError` are **not** `SiloError` — Silo never answered. A `NetworkError` on a write does not prove the write failed; read the entry back before deciding whether to retry.
 

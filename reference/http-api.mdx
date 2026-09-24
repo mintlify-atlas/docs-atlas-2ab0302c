@@ -41,6 +41,12 @@ curl http://localhost:8090/api/projects/default/envs/prod/collections/posts \
 | `GET` | `/api/health` | Liveness and version — never authenticated |
 | `GET` | `/api/session` | Current key label, prefix, and effective claims |
 
+### MCP
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/mcp` | MCP over Streamable HTTP: one JSON-RPC message, or a batch, in; the reply out. Requires a key. `GET` and `DELETE` answer `405` |
+
 ### Projects & Environments
 
 | Method | Path | Description |
@@ -157,7 +163,6 @@ The `engine` field is `fts5` when SQLite's full-text index answered, or `scan` w
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` / `POST` | `/api/keys` | List keys / create one. The secret is returned exactly once |
-| `PATCH` | `/api/keys/{id}` | Update the label or claims (secret unchanged) |
 | `DELETE` | `/api/keys/{id}` | Revoke a key and everything descended from it |
 
 ### Media
@@ -206,9 +211,9 @@ The `engine` field is `fts5` when SQLite's full-text index answered, or `scan` w
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/media/{id}` | Stream a media asset — no authentication required |
+| `GET` | `/media/{id}` | Stream a media asset — no authentication required, no `/api/` prefix |
 
-The file is read from the store as it is sent and never held whole. A single `Range: bytes=…` header answers `206 Partial Content` with `Content-Range`; a range past the end of the file answers `416`. Every response carries `X-Content-Type-Options: nosniff` and `Content-Security-Policy: sandbox`. Images, video, audio, and PDF are served `inline`; SVG and all other types are sent as `attachment` so a browser downloads them rather than rendering them as a page. An `<img>` tag still displays an attachment.
+The file is read from the store as it is sent and never held whole. A single `Range: bytes=…` header answers `206 Partial Content` with `Content-Range`; a range past the end of the file answers `416`. A whole (non-range) response carries no `Content-Length`. Every response carries `X-Content-Type-Options: nosniff` and `Content-Security-Policy: sandbox`. Images, video, audio, and PDF are served `inline`; SVG and all other types are sent as `attachment` so a browser downloads them rather than rendering them as a page. An `<img>` tag still displays an attachment.
 
 ## Optimistic concurrency
 

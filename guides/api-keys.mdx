@@ -122,34 +122,42 @@ Every claim Silo recognizes is listed here. In the collection claims, `<p>` is t
 | `*` | Full access (root claim) |
 | `collections:<p>/<e>/<n>:create` | Create a collection |
 | `collections:<p>/<e>/<n>:delete` | Delete a collection |
-| `collections:<p>/<e>/<n>:schema:read` | Read a schema |
-| `collections:<p>/<e>/<n>:schema:update` | Update a schema |
+| `collections:<p>/<e>/<n>:schema:read` | Read a collection schema |
+| `collections:<p>/<e>/<n>:schema:update` | Update a collection schema |
+| `collections:<p>/<e>/<n>:access:update` | Change a collection's access settings (e.g. `x-silo-auth`) |
 | `collections:<p>/<e>/<n>:entries:create` | Create entries |
 | `collections:<p>/<e>/<n>:entries:read` | Read entries |
 | `collections:<p>/<e>/<n>:entries:update` | Update entries |
 | `collections:<p>/<e>/<n>:entries:delete` | Delete entries |
+| `hooks:<p>/<e>/<n>:<hook>` | Deliver hook payloads for a collection (one of the six hook names; no wildcard on `<hook>`) |
 | `media:create` | Upload, rename, and move media assets |
 | `media:delete` | Delete media assets |
 | `media:replace` | Replace the file behind an existing asset (keeps id, name, and URL) |
 | `media:purge` | Empty the entire media library (requires `media:delete` too) |
-| `media:configure` | Change media storage settings (bucket, credentials, allowed types) |
+| `media:configure` | Change media storage settings (bucket, credentials, allowed types) — root-only |
 | `keys:read` | List API keys |
 | `keys:create` | Create and edit API keys |
 | `keys:revoke` | Revoke keys |
+| `keys:export` | Export key records (hashes and metadata) |
+| `keys:import` | Import key records |
+| `plugins:read` | List plugins and their status |
+| `plugins:grant` | Approve plugin claim grants — root-only |
+| `plugins:enable` | Enable or disable plugins — root-only |
+| `plugins:configure` | Change a plugin's configuration |
+| `audit:read` | Read the audit trail |
+| `http:route` | Allow a plugin to be reached at the routes its manifest declares |
+| `settings:configure` | Change server settings (logging, search, auth, etc.) — root-only |
+| `observability:read` | Read aggregate operating metrics |
 | `transfer:export` | Export data as a tarball archive |
 | `transfer:import` | Import a tarball archive |
 | `transfer:copy` | Pull and import data from another Silo instance |
-| `plugins:read` | List plugins |
-| `plugins:grant` | Approve plugin claim grants |
-| `plugins:enable` | Enable or disable plugins |
-| `audit:read` | Read the audit trail |
-| `settings:configure` | Change server settings (logging, search, auth, etc.) |
-| `observability:read` | Read aggregate operating metrics |
 
 <Note>
   `media:purge` is intentionally not part of `media:delete`. Purging the entire library is a separate, irreversible operation. The purge route requires **both** `media:purge` and `media:delete` — holding one alone does nothing.
 
-  Similarly, `media:configure` is root-only. It exposes credentials and storage endpoints, so it is never carried by plugins and cannot be granted outside of a root-preset key.
+  `media:configure` and `settings:configure` are root-only. Both expose credentials or security-sensitive configuration and cannot be carried by plugins or granted outside a root-preset key.
+
+  `hooks:<p>/<e>/<n>:<hook>` uses one of the six named hook positions. The `<hook>` segment does not accept a wildcard.
 </Note>
 
 ## Wildcards and name patterns
@@ -201,12 +209,14 @@ Presets are named shortcuts over the same claim set. The CLI's `--preset` flag a
 | Preset | Claims included |
 |---|---|
 | `root` | `*` — full access to everything |
-| `manage` | Collection lifecycle, keys, media (including `media:replace`), plugins, settings, observability. Not `media:purge`, `media:configure`, or `settings:configure` |
-| `write` | Read + create/update/delete entries, upload and delete media |
-| `read` | Read entries, schemas, and search (default for `silo keys create`) |
+| `manage` | Collection lifecycle (`create`, `delete`, `schema:read`, `schema:update`, `access:update`), entries CRUD, media (`create`, `delete`, `replace` — not `purge` or `configure`), `keys:read` / `keys:create` / `keys:revoke`, `plugins:read` / `plugins:configure`, `audit:read`, `observability:read` |
+| `write` | Entries CRUD, `schema:read`, `media:create`, `media:delete`, `transfer:export` |
+| `read` | `entries:read`, `schema:read` (default for `silo keys create`) |
 
 <Note>
   `plugins:grant` and `plugins:enable` are carried only by the `root` preset. Empowering a plugin to act on your instance is always an explicit, deliberate grant — no convenience preset includes it.
+
+  `settings:configure`, `media:configure`, and `media:purge` are also root-only and are not carried by any other preset.
 </Note>
 
 ## Audit trail

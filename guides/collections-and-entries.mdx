@@ -33,6 +33,31 @@ curl -X POST http://localhost:8090/api/projects/acme/envs/prod/collections \
 
 The JSON Schema block above defines a blog posts collection. `title` and `status` are required; `body` and `tags` are optional. Silo validates every entry write against this shape.
 
+## Managing collections
+
+Beyond creating a collection, Silo provides endpoints to list, rename, and delete collections within a project/environment.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/projects/{project}/envs/{env}/collections` | List all collections |
+| `POST` | `/api/projects/{project}/envs/{env}/collections` | Create a collection with `{name, schema}` |
+| `PATCH` | `/api/projects/{project}/envs/{env}/collections/{name}` | Rename a collection (`?dry_run=true` available) |
+| `DELETE` | `/api/projects/{project}/envs/{env}/collections/{name}` | Delete a collection and all its entries (`?force=true`) |
+
+## Managing a collection's schema
+
+After a collection is created, you can read, replace, or delete its schema through the schema sub-resource.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/projects/{project}/envs/{env}/collections/{name}/schema` | Fetch the current schema |
+| `PUT` | `/api/projects/{project}/envs/{env}/collections/{name}/schema` | Replace the schema |
+| `DELETE` | `/api/projects/{project}/envs/{env}/collections/{name}/schema` | Remove the schema |
+
+<Note>
+  `PUT` returns `409` if the collection holds entries and the new schema changes which entries are valid. See [Schema validation](#schema-validation) for the full rules on what can and cannot change.
+</Note>
+
 ## Entry CRUD operations
 
 Every entry gets a ULID `id` assigned at creation time. Use that `id` — along with the `rev` — for all subsequent reads, updates, and deletes.
@@ -103,7 +128,7 @@ Silo returns entries as flat objects. The envelope fields (`id`, `rev`, `created
 ```
 
 <Note>
-  Five field names are reserved for the envelope: `id`, `rev`, `seq`, `created_at`, and `updated_at`. Silo refuses a schema that declares any of them, and refuses an entry that carries one.
+  The `id`, `rev`, `created_at`, and `updated_at` fields are reserved envelope keys. Silo refuses a schema that declares any of them, and refuses an entry body that includes one. The `seq` counter is an internal field used by Silo for ordering; it is never included in the API response.
 </Note>
 
 ## Optimistic concurrency

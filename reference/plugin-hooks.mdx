@@ -1,7 +1,7 @@
 ---
 title: "Silo plugin hooks: entry and collection lifecycle events"
 sidebarTitle: "Plugin Hooks"
-description: "Six lifecycle hooks let plugins react to entry and collection events. Mutate data before validation, reject writes, or observe commits. Hooks fire for API writes, not for import."
+description: "All six Silo plugin hooks: payloads, mutation rules, delivery semantics, claim format, dispatch order, and error handling for entry and collection events."
 ---
 
 Silo provides six hooks that let plugins observe or intercept the entry and collection lifecycle. Three pairs cover the two moments of an entry write (before and after), one pair covers delete, and one hook fires when a collection or its parent scope is erased. Hooks fire for the CRUD API and for a plugin's own `ctx` writes — they deliberately do not fire for `silo import` or a scope copy.
@@ -167,7 +167,7 @@ There is no `collection.beforeDelete` counterpart. A veto there would overrule a
 
 | Value | Behaviour |
 |---|---|
-| `fail` *(default)* | Refuses the write. Logs the error. Plugin stays in failed state. |
+| `fail` *(default)* | Refuses the write. Logs the error. |
 | `skip` | Logs the error. Write proceeds as if the plugin were not present. |
 
 ---
@@ -192,10 +192,10 @@ name = "plugin-b"
 Each hook dispatch has a per-plugin `timeout_ms` (default `5000`). A dispatch that exceeds its budget leaves the plugin in `failed` state. The plugin is torn down and **not** automatically restarted — a plugin that missed its budget is usually still spinning, so an automatic respawn would walk into the same wall while hiding that anything happened.
 
 ```sh
-# Bring a failed plugin back deliberately
-silo plugin restart silo-plugin-slug
-# or via the management API:
+# Bring a failed plugin back deliberately via the management API:
 # POST /api/plugins/silo-plugin-slug/restart
+curl -X POST http://localhost:8090/api/plugins/silo-plugin-slug/restart \
+  -H "Authorization: Bearer $SILO_KEY"
 ```
 
 A timed-out `before` hook answers `504` to the API caller (governed by `on_error`). A timed-out `after` hook is logged and the original request succeeds.

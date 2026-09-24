@@ -42,7 +42,7 @@ http_headers = { Authorization = "Bearer silo_..." }
 
 ### stdio via `silo mcp`
 
-`silo mcp` speaks MCP on stdin and stdout and forwards every message to a running Silo instance. It needs the server's URL and a key, as flags or as `SILO_URL` and `SILO_API_KEY` environment variables.
+`silo mcp` speaks MCP on stdin and stdout and forwards every message to a running Silo instance. It accepts `--url` and `--key` flags, or reads the same values from `SILO_URL` and `SILO_API_KEY` environment variables.
 
 <Note>
   Prefer environment variables over flags. A key on the command line is visible to every process on the machine.
@@ -72,13 +72,13 @@ claude mcp add silo --env SILO_API_KEY=silo_... -- silo mcp --url http://localho
 
 <CardGroup cols={2}>
   <Card title="Claude Desktop" icon="desktop">
-    Download the extension, then open the `silo.mcpb` file. It appears as **Silo** under Settings &gt; Extensions, with the server URL and API key pre-filled. No separate Node or Silo installation is needed.
+    Download the extension (`silo.mcpb`), then open the file. It appears as **Silo** under Settings &gt; Extensions, with the server URL and API key pre-filled from the current connection. No separate Node or Silo installation is needed. The downloaded file contains the saved API key as a default; keep it private.
   </Card>
   <Card title="Claude Code" icon="terminal">
-    Copy and run the displayed user-scope command. Running it again from a different connection switches Claude Code over automatically.
+    Copy and run the displayed user-scope command. It removes an existing user-scope `silo` server first, so running it again from a different connection switches Claude Code over automatically.
   </Card>
   <Card title="Codex" icon="code">
-    Copy the setup prompt into a local Codex task and approve the configuration change when asked. The page also shows the TOML block for manual setup.
+    Copy the setup prompt into a local Codex task and approve the configuration change when asked. The page also shows the TOML block for manual setup. A cloud task cannot change a local configuration.
   </Card>
   <Card title="Cursor" icon="mouse-pointer">
     Click **Add to Cursor** to open Cursor directly, or merge the manual JSON shown on the page. The credential is not sent through a web proxy.
@@ -96,20 +96,20 @@ Every key sees the same tool list. What differs is which calls succeed. The clai
 | `create_project` | Create a project | `collections:<p>/*/*:create` |
 | `list_environments` | Environments of a project | any collection claim in the environment |
 | `create_environment` | Create an environment | `collections:<p>/<e>/*:create` |
-| `list_variables` | Variables with values | `collections:<p>/<e>/*:entries:read` |
+| `list_variables` | Declared variables with this environment's values | `collections:<p>/<e>/*:entries:read` |
 | `list_collections` | Collections with entry counts | `collections:<p>/<e>/<c>:schema:read` per collection |
-| `get_schema` | One collection's schema | `collections:<p>/<e>/<c>:schema:read` |
-| `create_collection` | Create a collection | `collections:<p>/<e>/<c>:create` |
-| `update_schema` | Replace a schema | `collections:<p>/<e>/<c>:schema:update` |
-| `delete_collection` | Delete a collection | `collections:<p>/<e>/<c>:delete`, plus `entries:delete` with `force` |
+| `get_schema` | One collection's JSON Schema, references bundled | `collections:<p>/<e>/<c>:schema:read` |
+| `create_collection` | Create a collection from a schema | `collections:<p>/<e>/<c>:create` |
+| `update_schema` | Replace a schema (frozen while entries exist) | `collections:<p>/<e>/<c>:schema:update` |
+| `delete_collection` | Delete a collection; `force` erases its entries | `collections:<p>/<e>/<c>:delete`, plus `entries:delete` with `force` |
 | `list_entries` | Filtered, sorted page of entries | `collections:<p>/<e>/<c>:entries:read` |
 | `get_entry` | One entry with its `rev` | `collections:<p>/<e>/<c>:entries:read` |
-| `create_entry` | Create an entry | `collections:<p>/<e>/<c>:entries:create` |
-| `update_entry` | Replace an entry's fields | `collections:<p>/<e>/<c>:entries:update` |
-| `delete_entry` | Delete an entry | `collections:<p>/<e>/<c>:entries:delete` |
+| `create_entry` | Create an entry, validated against the schema | `collections:<p>/<e>/<c>:entries:create` |
+| `update_entry` | Replace an entry's fields, with the `rev` you read | `collections:<p>/<e>/<c>:entries:update` |
+| `delete_entry` | Delete an entry, with the `rev` you read | `collections:<p>/<e>/<c>:entries:delete` |
 | `search` | Text search across one collection, environment, or everything | `entries:read` where it looks |
-| `list_media` | Media catalog, filtered and paged | public (endpoint still needs a key) |
-| `get_media` | One asset's catalog record | public (endpoint still needs a key) |
+| `list_media` | Media catalog, filtered and paged | public read (the MCP endpoint still needs a key) |
+| `get_media` | One asset's catalog record | public read (the MCP endpoint still needs a key) |
 
 <Note>
   Media uploads have no MCP tool — a tool call carries JSON and a file is bytes. Upload media directly with `POST /api/media`.
@@ -127,4 +127,4 @@ Silo implements `initialize`, `ping`, `tools/list`, and `tools/call`, and accept
 
 The endpoint is **stateless**. There is no `Mcp-Session-Id`, so nothing expires and any number of clients may share one key. `GET /api/mcp` and `DELETE /api/mcp` return `405` — there is no event stream to open and no session to close. A JSON array (batch request) is accepted and answered as an array. A notification (a message without an `id`) returns `202` with no body.
 
-A request without a key returns `401` with a `WWW-Authenticate: Bearer` challenge, even on an instance with public collections. The endpoint sits under `/api/*`, so CORS, the JSON body size limit, and the auth middleware all apply exactly as they do on every other API route.
+A request without a key returns `401` with a `WWW-Authenticate: Bearer` challenge, even on an instance with public collections — the endpoint requires a key regardless of collection visibility. The endpoint sits under `/api/*`, so CORS, the JSON body size limit, and the auth middleware all apply exactly as they do on every other API route.

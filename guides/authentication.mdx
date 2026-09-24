@@ -101,8 +101,8 @@ Every key is created with a set of claims. Four built-in presets cover the most 
 | Preset | What it covers |
 |---|---|
 | `root` | Full access (`*`) — every operation on every resource |
-| `manage` | Collection lifecycle, keys, media, plugins, settings (not root-only claims) |
-| `write` | Read + create, update, and delete entries and media |
+| `manage` | Collection lifecycle, keys (read/create/revoke), media (not purge or configure), plugins (read and configure), audit and observability |
+| `write` | Entries (create/read/update/delete), schema reads, media upload and delete, transfer export |
 | `read` | Read entries and schemas (default for `silo keys create`) |
 
 <Tip>

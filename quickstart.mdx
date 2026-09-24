@@ -1,7 +1,7 @@
 ---
-title: "Get started with Silo in under 5 minutes"
+title: "Quickstart: Install Silo and make your first API call"
 sidebarTitle: "Quickstart"
-description: "Install Silo with Homebrew, Docker, dnf, or a prebuilt binary, create your first collection, and make your first API call in under 5 minutes."
+description: "Install Silo with Homebrew, Docker, dnf, or a prebuilt binary, create your first collection, and make your first API call in under five minutes."
 ---
 
 Silo ships as a self-contained binary that includes both the server and the admin UI. Pick the installation method that fits your environment, start the server, and you will have a live REST API and a generated admin interface in minutes.
@@ -26,6 +26,7 @@ docker run -p 8090:8090 -v silo_data:/data labsatquicko/silo
 sudo curl -fsSL -o /etc/yum.repos.d/silo.repo \
   https://org-quicko.github.io/silo/silo.repo
 sudo dnf install silo
+sudo systemctl enable --now silo
 ```
 
 ```sh Prebuilt binary

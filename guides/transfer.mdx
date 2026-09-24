@@ -1,7 +1,7 @@
 ---
 title: "Export, import, and copy data between Silo instances"
 sidebarTitle: "Transfer"
-description: "Export any scope to a tar.gz archive or directory. Import it to another instance. Copy between environments. Every transfer is streaming with no memory buffer."
+description: "Export to a tar.gz archive or directory. Import to another instance. Copy between environments. Every transfer streams with no staging pass on disk."
 ---
 
 Silo's transfer system moves content between instances, environments, and storage drivers. Every export is streaming — the first bytes leave immediately and no copy of your data is staged on disk first. Archives are reproducible tar.gz files ordered by collection and entry id, byte-for-byte identical from identical data. API key hashes are excluded by default so a content export you share with others ships no credentials.
@@ -86,6 +86,10 @@ silo import backup.tar.gz --dry-run           # report changes, write nothing
 
 Check an untrusted archive with `--dry-run` before applying it.
 
+<Note>
+  A dry run always reports `rejected: 0`. It does not write schemas, so it has nothing to compare entries against. Use it to preview adds, updates, and schema conflicts — not to audit validation.
+</Note>
+
 ### Import result shape
 
 ```json
@@ -151,6 +155,8 @@ curl -X POST "http://new-silo:8090/api/import" \
 {"type":"result","result":{"added":412,"updated":0,...}}
 ```
 
+The stream sends a `progress` line whenever the importer reports (every 200 entries and at each phase boundary), a bare heartbeat after each second of silence, and a final `result` or `error` line. The **HTTP status goes out before the work begins** — the first byte is the status line, and the outcome is the last line.
+
 <Warning>
   **Read the last line, not the HTTP status code.** The status is sent before work starts, so it is always `200`. A failure arrives as an `error` line:
 
@@ -214,6 +220,7 @@ The admin exposes this at **Settings > Environment > Data Transfer** with a prev
 |---|---|
 | `transfer:export` | Also needs `collections:*/*/*:schema:read` and `collections:*/*/*:entries:read` (or narrowed equivalents) |
 | `transfer:import` | Also needs `entries:create`, `entries:update`, `entries:delete` on the destination scope |
+| `transfer:copy` | Requires both `transfer:export` authority on the source and `transfer:import` authority on the destination |
 
 ## Archive format and on-disk layout
 
@@ -248,6 +255,19 @@ Archives arriving over HTTP are checked twice before anything is written:
 A request past either limit gets a `413` with code `archive_too_large`. The message names the setting to raise. Both limits apply to `/api/import` and `/api/copy`. A file you name on the command line is not checked.
 
 Raise both to copy a large instance. Both are configurable in `silo.toml` or from **Settings > Configuration > Transfers** in the admin.
+
+## Importing system records
+
+An archive can carry Silo's own records under `_system`. A selection cannot name them, so the import checks them after unpacking, against the same claims their own routes require:
+
+| Records | Claim needed |
+|---|---|
+| `_keys` | `keys:import` |
+| `_media`, `_media_folders`, `_media_folder_moves` | `media:create` (even with `media=none`); `media:delete` too when `replace` would empty them |
+| `_variables` for a project | `create` and `entries:update` on `<project>/*/*` |
+| `_audit`, `_plugins`, `_scope_renames`, any other `_` name | Never imported — the request is a `400` |
+
+A missing claim is a `403` that names the records and the claim. The check reads rows, not empty collections, so exporting an empty library loads with content permissions alone. The `silo import` CLI on the host is trusted and loads all of it.
 
 ## Cross-driver migration
 

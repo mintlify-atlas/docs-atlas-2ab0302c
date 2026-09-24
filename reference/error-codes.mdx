@@ -141,10 +141,15 @@ The `@org-quicko/silo-client` package maps every `code` value to a typed error c
 | `UnauthorizedError` | `unauthorized` | 401 |
 | `ForbiddenError` | `forbidden` | 403 |
 | `NotFoundError` | `not_found` | 404 |
+| `MethodNotAllowedError` | `method_not_allowed` | 405 |
 | `ConflictError` | `conflict` | 409 |
 | `MediaInUseError` | `media_in_use` | 409 |
-| `MediaDeleteStalledError` | `media_delete_stalled` | 500 |
+| `PayloadTooLargeError` | `payload_too_large` | 413 |
+| `ArchiveTooLargeError` | `archive_too_large` | 413 |
 | `InternalError` | `internal` | 500 |
+| `MediaDeleteStalledError` | `media_delete_stalled` | 500 |
+| `PluginStartFailedError` | `plugin_start_failed` | 500 |
+| `BusyError` | `busy` | 503 |
 
 ### TypeScript error handling example
 

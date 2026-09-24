@@ -1,7 +1,7 @@
 ---
 title: "Configure Silo with silo.toml and environment variables"
 sidebarTitle: "Configuration"
-description: "Silo reads configuration from silo.toml, SILO_* environment variables, and CLI flags. Every key is optional with sensible defaults. Run silo init to generate the file."
+description: "Silo reads silo.toml, SILO_* environment variables, and CLI flags. Every key is optional. Run silo init to generate the file with all defaults annotated."
 ---
 
 Silo resolves configuration in layers, highest priority first: **CLI flags** override **`SILO_*` environment variables**, which override the **`silo.toml` file**, which fall back to **built-in defaults**. Every key is optional — a fresh instance starts with no config file at all and the defaults are production-ready.
@@ -100,7 +100,7 @@ Every key in `silo.toml` has a corresponding `SILO_*` variable. Use them in cont
 | `SILO_BLOB_S3_BUCKET`, `SILO_BLOB_S3_REGION`, `SILO_BLOB_S3_ENDPOINT` | `[blob_storage]` S3 settings |
 | `SILO_BLOB_S3_ACCESS_KEY_ID`, `SILO_BLOB_S3_SECRET_ACCESS_KEY` | `[blob_storage]` S3 credentials |
 | `SILO_BLOB_S3_FORCE_PATH_STYLE` | `[blob_storage] force_path_style` |
-| `SILO_MEDIA_BASE_URL` | `[media] base_url` |
+| `SILO_MEDIA_BASE_URL`, `SILO_MEDIA_BASE_URL_TARGET` | `[media] base_url` |
 | `SILO_MEDIA_EXTENSIONS` | `[media] extensions` (comma-separated) |
 | `SILO_AUTH_DISABLED` | `[auth] disabled` |
 | `SILO_SCHEMA_ALLOW_REMOTE_REFS` | `[schema] allow_remote_refs` |
@@ -250,3 +250,11 @@ A collection's JSON Schema can reference another schema with a standard `$ref`.
 </CardGroup>
 
 Saving a schema bundles its `$refs` into `$defs` and preserves the original reference URL, so the stored document is self-contained. Deleting a collection another schema references fails with `409` unless forced.
+
+## Auth settings
+
+`[auth] disabled = true` removes all authentication and treats every request as root. It is a development convenience only — set it in a config file or via `SILO_AUTH_DISABLED`, never in production.
+
+<Warning>
+  The Settings API (`PUT /api/settings/auth`) can set `disabled` to `false` but **never to `true`**. An API that could switch off its own authentication would be a lock whose key opens from the inside. To enable the bypass, edit `silo.toml` directly or set `SILO_AUTH_DISABLED=true` in the environment.
+</Warning>

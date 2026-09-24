@@ -33,8 +33,10 @@ A successful upload returns the asset's catalog record:
 }
 ```
 
+Use the `url` field to serve the file to end users. Store the `silo://media/<id>` reference in entries so the URL resolves correctly even after a rename or move.
+
 <Note>
-  The file type must be in the configured allowlist. SVG is excluded from the default list for security reasons (SVGs can embed JavaScript). To permit SVG uploads, add `svg` to the `[media] extensions` list in `silo.toml`.
+  The file type must be in the configured allowlist. SVG is excluded from the default list for security reasons — SVG files can carry embedded script. To permit SVG uploads, add `svg` to the `[media] extensions` list in `silo.toml`.
 </Note>
 
 ## Referencing a media asset from an entry
@@ -60,6 +62,8 @@ When creating or updating an entry, set the field to the asset reference:
 }
 ```
 
+On every read, Silo resolves the reference and replaces it with the current `url` from the asset record.
+
 <Tip>
   Store the reference URI — not the URL. A URL breaks if the asset is ever renamed or moved; the reference stays stable because Silo resolves it to the current URL on every read.
 </Tip>
@@ -70,7 +74,7 @@ Silo supports two storage backends, configured in `silo.toml` under `[blob_stora
 
 <CardGroup cols={2}>
   <Card title="Local disk (default)" icon="hard-drive">
-    Files are stored at `<data dir>/media`. No extra configuration needed. Best for single-server deployments where the data directory is on durable storage.
+    Files are stored at `<data dir>/media`. No extra configuration needed. Best for single-server deployments where the data directory is on durable storage. The driver name is `fs`.
   </Card>
   <Card title="S3-compatible" icon="cloud">
     AWS S3, MinIO, Cloudflare R2, DigitalOcean Spaces, or any other S3-compatible service. Set `driver = "s3"` and supply your credentials and bucket in `[blob_storage]`.
@@ -89,14 +93,15 @@ endpoint = "https://s3.amazonaws.com"   # omit for AWS; set for MinIO / R2 / Spa
 
 ## Media URLs
 
-The URL shape depends on your `base_url` setting and whether you are using a named bucket.
+How a media URL is formed depends on your `base_url` setting and your storage backend configuration.
 
-| Setup | Example URL |
-|---|---|
-| Local disk, no `base_url` | `http://localhost:8090/media/<id>` |
-| Local disk, `base_url = "https://cms.example.com"` | `https://cms.example.com/media/<id>` |
-| S3 without public bucket URL | `https://cms.example.com/media/<id>` (proxied) |
-| S3 with `public_url = "https://cdn.example.com"` | `https://cdn.example.com/<id>` |
+`base_url` sets the host used in all media URLs. Set it to your public domain so asset URLs work outside localhost.
+
+| Setup | URL shape | Who serves the file |
+|---|---|---|
+| Local disk (any `base_url`) | `<base_url>/media/<id>` | Silo streams from disk |
+| S3 bucket, `public_read = true` | Bucket's own URL | The bucket serves directly |
+| S3 bucket, `public_read = false` | `<base_url>/media/<id>` | Silo proxies from the bucket |
 
 Silo streams the file from the store on the fly — it is never buffered whole. A `Range: bytes=...` request returns `206 Partial Content`, so video and audio players can seek correctly.
 
@@ -183,7 +188,7 @@ Folders are plain path strings. Create them explicitly or let an upload create t
 </Steps>
 
 <Warning>
-  A delete refused because the asset is still in use returns `409 media_in_use`. The response body includes `usage_count` (total referring entries), `visible_count` (how many this key can read), and up to 20 referrers. Use `?force=true` only when you are sure you want broken references.
+  A delete refused because the asset is still in use returns `409 media_in_use`. The response body includes `usage_count` (total referring entries), `visible_count` (how many this key can read), `visible_capped` (whether the referrer sample was cut short), and up to 20 referrers. Use `?force=true` only when you are sure you want broken references.
 </Warning>
 
 ## Bulk operations
@@ -215,4 +220,15 @@ curl http://localhost:8090/api/media/01J9AB3ZK60T72CNPCM222E3Z/usages \
   -H "Authorization: Bearer $SILO_KEY"
 ```
 
-The response includes `total` (the true referrer count), `visible` (how many this key can read), and `visible_capped` (whether the sample was cut short). A key may not have read access to every referencing environment, so `visible` can be less than `total`.
+The response includes `total` (the true referrer count), `visible` (how many this key can read), `visible_capped` (whether the sample was cut short), and `referrers` — up to 20 entries that reference this asset. A key may not have read access to every referencing environment, so `visible` can be less than `total`.
+
+## Extensions endpoint
+
+To populate a file-type filter in your own UI, fetch the distinct extensions currently held in the library:
+
+```bash
+curl http://localhost:8090/api/media/extensions \
+  -H "Authorization: Bearer $SILO_KEY"
+```
+
+This returns the list of file extensions (for example `["jpg", "mp4", "pdf"]`) that the library actually holds, matching what the admin UI uses for its Type filter.

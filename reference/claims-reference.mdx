@@ -148,9 +148,9 @@ Once a key is presented it becomes the visibility boundary: a scoped key sees on
 | Preset | CLI flag | What it carries |
 |---|---|---|
 | `root` | `--preset root` | `*` — everything |
-| `manage` | `--preset manage` | Collection lifecycle (create/delete/schema/access), all media except `purge` and `configure`, `keys:read/create/revoke`, `plugins:read/configure`, `audit:read`, `observability:read`, `settings:configure` |
+| `manage` | `--preset manage` | Collection lifecycle (create/delete/schema/access), all media except `purge` and `configure`, `keys:read/create/revoke`, `plugins:read/configure`, `audit:read`, `observability:read` |
 | `write` | `--preset write` | `entries` CRUD, `schema:read`, `media:create/delete`, `transfer:export` |
-| `read` | `--preset read` *(default)* | `entries:read`, `schema:read`, search, `transfer:export` |
+| `read` | `--preset read` *(default)* | `entries:read`, `schema:read` |
 
 <Note>
 `plugins:grant` and `plugins:enable` appear in no preset but `root`. Empowering a plugin or toggling its running state is always a deliberate action that requires root authority.
