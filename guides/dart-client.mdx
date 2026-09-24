@@ -1,0 +1,210 @@
+---
+title: "Silo Dart client for Flutter and the Dart VM"
+sidebarTitle: "Dart Client"
+description: "The silo_client Dart package targets the Dart VM, Flutter, and the web. Built on package:http and package:clock with Stream-based pagination and CancellationSignal."
+---
+
+The `silo_client` Dart package exposes the same surface as the TypeScript and Java clients — immutable path-based handles, typed entries, filter builders, pagination, search, media, and variables — targeting the Dart VM, Flutter, and the web. It is published to pub.dev as `silo_client`. Where Dart forces a naming difference the client follows the Java conventions, so a developer reading both should not encounter two vocabularies for the same concept.
+
+## Installation
+
+```yaml
+dependencies:
+  silo_client: ^1.0.0  # check pub.dev for the latest version
+```
+
+## Basic usage
+
+```dart
+import 'package:silo_client/silo_client.dart';
+
+final silo = Silo(url: 'http://localhost:8090', key: Platform.environment['SILO_KEY']);
+final movies = silo.project('moviespace').environment('prod').collection('movies');
+
+final page = await movies.list(limit: 10);
+for (final movie in page.entries) {
+  print(movie.fields['title']);
+}
+```
+
+`silo.project('moviespace').environment('prod')` sends no request — it only builds the path. Nothing needs an `await` until the actual read.
+
+## Typed collections with converters
+
+Use `withConverter` to attach a typed converter to a collection. The entry shape then becomes `Entry<YourType>` with a strongly-typed `fields` property.
+
+```dart
+final movies = silo
+    .project('moviespace')
+    .environment('prod')
+    .collection('movies')
+    .withConverter(Movie.fromJson);
+
+final page = await movies.list(limit: 10);
+for (final movie in page.entries) {
+  print(movie.fields.title);   // typed
+}
+```
+
+## Entry shape
+
+Like the Java client, the Dart client uses `Entry<F>` to separate the envelope from your fields. Dart cannot express the TypeScript flat-union `Fields & EntryEnvelope` as a single type without losing the typed fields.
+
+```dart
+final entry = await movies.get(entryId);
+
+// Envelope
+final id        = entry.id;
+final rev       = entry.rev;
+final createdAt = entry.createdAt;
+
+// Your fields (typed via withConverter, or Map<String, dynamic> without one)
+final fields = entry.fields;
+```
+
+## CRUD operations
+
+```dart
+// Create
+final created = await movies.create({
+  'title': 'Arrival',
+  'year': 2016,
+  'status': 'draft',
+  'genres': ['sci-fi'],
+});
+
+// Replace — takes the revision you read; raises ConflictException if stale
+await movies.replace(created.id, created.rev, {
+  'title': 'Arrival',
+  'year': 2016,
+  'status': 'published',
+  'genres': ['sci-fi', 'drama'],
+});
+
+// Delete
+await movies.delete(created.id, created.rev);
+
+// Read raw before editing
+final draft = await movies.get(entryId, variables: VariableMode.raw);
+```
+
+### Reading raw before editing
+
+Silo resolves `{{VARIABLE}}` references in content on the way out. Pass `variables: VariableMode.raw` when you intend to edit an entry, to avoid writing a resolved value back over a template reference.
+
+```dart
+final draft = await movies.get(entryId, variables: VariableMode.raw);
+// draft.fields['trailerUrl'] → '{{CDN_URL}}/trailers/arrival.mp4'
+
+await movies.replace(draft.id, draft.rev, {
+  ...draft.fields,
+  'status': 'published',
+});
+```
+
+## Filters
+
+Filters are **untyped** — Dart has no equivalent of TypeScript's `keyof`. Use string field names directly. The method names follow the Java client conventions.
+
+```dart
+import 'package:silo_client/silo_client.dart';
+
+final page = await movies.list(
+  where: Filter.field('status').isEqualTo('published')
+      .and(Filter.each('genres').isEqualTo('sci-fi')),
+  sort: Sort.recentlyUpdated(),
+  limit: 20,
+);
+```
+
+Filter operators: `isEqualTo`, `notEqualTo`, `contains`, `greaterThan`, `atLeast`, `lessThan`, `atMost`, `oneOf`, `exists` — combined with `and`, `or`, `not`.
+
+## Pagination via Streams
+
+`all()` and `pages()` return `Stream`s rather than async iterators (the Dart VM has no `async*` iterator protocol that maps cleanly onto the TypeScript pattern).
+
+```dart
+// Async iterator for individual entries
+await for (final entry in movies.all(where: filter)) {
+  print(entry.fields['title']);
+}
+
+// Async iterator for pages
+await for (final page in movies.pages(limit: 100)) {
+  print('page ${page.pageNumber} of ${page.total}');
+}
+
+// Manual pagination
+final first = await movies.list(limit: 25);
+first.total;      // 137
+first.hasMore;    // true
+final second = await first.next();
+```
+
+## Cancellation
+
+`CancellationSignal` rides `package:http`'s `abortTrigger`. Pass a signal to any call.
+
+```dart
+final signal = CancellationSignal();
+signal.cancel();  // or set a deadline
+
+await movies.list(limit: 20, cancellationSignal: signal);
+```
+
+<Warning>
+  `package:http` surfaces a cancelled request as a `ClientException`. The client inspects the signal before interpreting the exception, so cancellation is reported as `RequestAbortedException` rather than `NetworkException`.
+</Warning>
+
+## Search
+
+```dart
+await movies.search(query: 'arrival');          // one collection
+await environment.search(query: 'arrival');     // one environment
+await silo.search(query: 'arrival');            // everything the key can read
+```
+
+## Error handling
+
+```dart
+import 'package:silo_client/silo_client.dart';
+
+try {
+  await movies.replace(movie.id, movie.rev, fields);
+} on ConflictException {
+  final current = await movies.get(movie.id);
+  await movies.replace(current.id, current.rev, fields);
+} on ValidationFailedException catch (e) {
+  print(e.details);
+}
+```
+
+`SiloException` is the base for anything Silo refused. `NetworkException`, `RequestTimeoutException`, `RequestAbortedException`, and `InvalidResponseException` are not `SiloException` — Silo never answered.
+
+## Naming conventions
+
+Where Dart forces a difference, the client follows Java:
+
+| Dart / Java | TypeScript | Reason |
+|---|---|---|
+| `isEqualTo` | `equals` | avoids `==` operator ambiguity |
+| `CollectionCatalog` | `CollectionPage` | follows Java naming |
+| `...Exception` | `...Error` | Dart/Java convention |
+
+`route_inventory_drift_test.dart` holds the client's route list and filter operators and checks them against the TypeScript lists, keeping the three clients in sync.
+
+## Anonymous access
+
+Omit the key to reach collections whose schema does not require authentication.
+
+```dart
+final silo = Silo(url: 'https://cms.moviespace.com');
+```
+
+## Source and releases
+
+The Dart client lives in `packages/silo-client-dart` in the Silo repository and releases independently under `silo-client-dart-v*` tags. It is published by hand to pub.dev.
+
+<Info>
+  `route_inventory_drift_test.dart` parses the TypeScript route inventory and holds the Dart list equal to it, so all three clients stay in sync as routes are added to Silo.
+</Info>
